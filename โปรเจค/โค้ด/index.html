@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบส่งงานพิมพ์ออนไลน์</title>
+    <!-- นำเข้า LIFF SDK -->
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background-color: #f5f5f5; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .profile-img { width: 60px; height: 60px; border-radius: 50%; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="tel"], select { width: 100%; padding: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background-color: #06C755; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>ระบบส่งงานพิมพ์ออนไลน์</h2>
+    
+    <!-- ส่วนแสดงโปรไฟล์ผู้ใช้ -->
+    <div id="user-info" class="form-group">
+        <img id="pictureUrl" class="profile-img" src="" alt="Profile Picture" style="display:none;">
+        <p><strong>สวัสดีคุณ:</strong> <span id="displayName">กำลังโหลด...</span></p>
+        <p><strong>LINE User ID:</strong> <span id="userId">กำลังโหลด...</span></p>
+    </div>
+
+    <hr>
+
+    <!-- ฟอร์มกรอกข้อมูลคำสั่งพิมพ์ -->
+    <form id="printForm">
+        <div class="form-group">
+            <label for="studentId">รหัสนักศึกษา</label>
+            <input type="text" id="studentId" required placeholder="เช่น 66060216xxxxx">
+        </div>
+
+        <div class="form-group">
+            <label for="phone">เบอร์โทรศัพท์</label>
+            <input type="tel" id="phone" required placeholder="เช่น 089xxxxxxx">
+        </div>
+
+        <div class="form-group">
+            <label for="pdfFile">อัปโหลดไฟล์เอกสาร (เฉพาะ PDF เท่านั้น)</label>
+            <input type="file" id="pdfFile" accept=".pdf" required>
+        </div>
+
+        <div class="form-group">
+            <label for="printMode">โหมดสี</label>
+            <select id="printMode">
+                <option value="ขาวดำ">ขาวดำ</option>
+                <option value="สี">สี</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="paperSize">ขนาดกระดาษ</label>
+            <select id="paperSize">
+                <option value="A4">A4</option>
+                <option value="A3">A3</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="pageType">รูปแบบหน้า</label>
+            <select id="pageType">
+                <option value="หน้าเดียว">หน้าเดียว</option>
+                <option value="สองหน้า">สองหน้า</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="quantity">จำนวนชุด</label>
+            <input type="number" id="quantity" value="1" min="1" required>
+        </div>
+
+        <div class="form-group">
+            <label for="bindingType">รูปแบบการเข้าเล่ม</label>
+            <select id="bindingType">
+                <option value="ไม่เข้าเล่ม">ไม่เข้าเล่ม (แม็กมุม)</option>
+                <option value="กระดูกงู">เข้าเล่มกระดูกงู</option>
+                <option value="สันกาว">เข้าเล่มสันกาว</option>
+            </select>
+        </div>
+
+        <button type="submit">ส่งคำสั่งพิมพ์</button>
+    </form>
+</div>
+
+<script>
+    // ฟังก์ชันรัน LIFF ดึงข้อมูลโปรไฟล์
+    async function main() {
+        await liff.init({ liffId: "ใส่_LIFF_ID_ของคุุณตรงนี้" }); // เปลี่ยนเป็น LIFF ID จริงของคุณ
+        if (liff.isLoggedIn()) {
+            const profile = await liff.getProfile();
+            document.getElementById("displayName").innerText = profile.displayName;
+            document.getElementById("userId").innerText = profile.userId;
+            if (profile.pictureUrl) {
+                const img = document.getElementById("pictureUrl");
+                img.src = profile.pictureUrl;
+                img.style.display = "block";
+            }
+        } else {
+            liff.login();
+        }
+    }
+    main();
+
+    // ดักจับการกดส่งฟอร์ม
+    document.getElementById("printForm").addEventListener("submit", function(e) {
+        e.preventDefault();
+        
+        // ทดสอบดึงค่าจากฟอร์มมาดูก่อน
+        const studentId = document.getElementById("studentId").value;
+        const phone = document.getElementById("phone").value;
+        const fileInput = document.getElementById("pdfFile");
+        const printMode = document.getElementById("printMode").value;
+        
+        alert(`รับข้อมูลแล้ว!\nรหัสนักศึกษา: ${studentId}\nไฟล์ที่เลือก: ${fileInput.files[0].name}\nโหมดสี: ${printMode}`);
+        
+        // ขั้นตอนต่อไป: เขียนโค้ดส่งข้อมูลและไฟล์นี้เข้าไปที่ฐานข้อมูล Supabase
+    });
+</script>
+
+</body>
+</html>

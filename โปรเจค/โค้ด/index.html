@@ -4,16 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบส่งงานพิมพ์ออนไลน์</title>
-    <!-- นำเข้า LIFF SDK -->
+    <!-- 1. นำเข้า LIFF SDK -->
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <!-- 2. เพิ่ม Supabase SDK ตรงนี้ -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <style>
         body { font-family: sans-serif; padding: 20px; background-color: #f5f5f5; }
         .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .profile-img { width: 60px; height: 60px; border-radius: 50%; }
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input[type="text"], input[type="tel"], select { width: 100%; padding: 8px; box-sizing: border-box; }
+        input[type="text"], input[type="tel"], input[type="number"], select { width: 100%; padding: 8px; box-sizing: border-box; }
         button { width: 100%; padding: 10px; background-color: #06C755; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+        button:disabled { background-color: #ccc; }
+        #status { margin-top: 15px; font-weight: bold; text-align: center; }
     </style>
 </head>
 <body>
@@ -85,42 +90,97 @@
             </select>
         </div>
 
-        <button type="submit">ส่งคำสั่งพิมพ์</button>
+        <button type="submit" id="submitBtn">ส่งคำสั่งพิมพ์</button>
     </form>
+
+    <div id="status"></div>
 </div>
 
 <script>
+    // --- ตั้งค่า Supabase (เอามาจาก Project Settings -> API) ---
+    const SUPABASE_URL = 'https://draoiczgmkhywyyakdgz.supabase.co'; // ใส่ URL ของคุณ
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRyYW9pY3pnbWtoeXd5eWFrZGd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NDgzMTIsImV4cCI6MjEwMDIyNDMxMn0.i9bFmNlX08y8mRurD5E5ra_S2QvN97NkFpDd1uLbYts'; // ใส่ anon key ของคุณ
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let lineUserId = '';
+    let lineDisplayName = '';
+
     // ฟังก์ชันรัน LIFF ดึงข้อมูลโปรไฟล์
     async function main() {
-        await liff.init({ liffId: "ใส่_LIFF_ID_ของคุุณตรงนี้" }); // เปลี่ยนเป็น LIFF ID จริงของคุณ
-        if (liff.isLoggedIn()) {
-            const profile = await liff.getProfile();
-            document.getElementById("displayName").innerText = profile.displayName;
-            document.getElementById("userId").innerText = profile.userId;
-            if (profile.pictureUrl) {
-                const img = document.getElementById("pictureUrl");
-                img.src = profile.pictureUrl;
-                img.style.display = "block";
+        try {
+            await liff.init({ liffId: "YOUR_LIFF_ID" }); // ใส่ LIFF ID ของคุณ
+            if (liff.isLoggedIn()) {
+                const profile = await liff.getProfile();
+                lineUserId = profile.userId;
+                lineDisplayName = profile.displayName;
+
+                document.getElementById("displayName").innerText = profile.displayName;
+                document.getElementById("userId").innerText = profile.userId;
+                if (profile.pictureUrl) {
+                    const img = document.getElementById("pictureUrl");
+                    img.src = profile.pictureUrl;
+                    img.style.display = "block";
+                }
+            } else {
+                liff.login();
             }
-        } else {
-            liff.login();
+        } catch (err) {
+            console.error("LIFF Init Error:", err);
+            document.getElementById("displayName").innerText = "ทดสอบบนเว็บเบราว์เซอร์ปกติ";
+            document.getElementById("userId").innerText = "test_user_id";
         }
     }
     main();
 
-    // ดักจับการกดส่งฟอร์ม
-    document.getElementById("printForm").addEventListener("submit", function(e) {
+    // ดักจับการกดส่งฟอร์ม แล้วบันทึกลง Supabase
+    document.getElementById("printForm").addEventListener("submit", async function(e) {
         e.preventDefault();
         
-        // ทดสอบดึงค่าจากฟอร์มมาดูก่อน
+        const submitBtn = document.getElementById("submitBtn");
+        const statusDiv = document.getElementById("status");
+        
+        submitBtn.disabled = true;
+        statusDiv.innerText = "⏳ กำลังส่งข้อมูล...";
+        statusDiv.style.color = "blue";
+
+        // ดึงค่าจากฟอร์ม
         const studentId = document.getElementById("studentId").value;
         const phone = document.getElementById("phone").value;
         const fileInput = document.getElementById("pdfFile");
         const printMode = document.getElementById("printMode").value;
-        
-        alert(`รับข้อมูลแล้ว!\nรหัสนักศึกษา: ${studentId}\nไฟล์ที่เลือก: ${fileInput.files[0].name}\nโหมดสี: ${printMode}`);
-        
-        // ขั้นตอนต่อไป: เขียนโค้ดส่งข้อมูลและไฟล์นี้เข้าไปที่ฐานข้อมูล Supabase
+        const paperSize = document.getElementById("paperSize").value;
+        const pageType = document.getElementById("pageType").value;
+        const quantity = parseInt(document.getElementById("quantity").value);
+        const bindingType = document.getElementById("bindingType").value;
+
+        const fileName = fileInput.files[0] ? fileInput.files[0].name : '';
+
+        // ส่งข้อมูลเข้าตาราง 'orders' ใน Supabase
+        const { data, error } = await supabaseClient
+            .from('orders')
+            .insert([
+                { 
+                    line_user_id: lineUserId || 'test_user_id', 
+                    customer_name: lineDisplayName || 'ผู้ใช้งานทดสอบ', 
+                    paper_size: paperSize,
+                    color_mode: printMode,
+                    quantity: quantity,
+                    status: 'pending'
+                }
+            ]);
+
+        if (error) {
+            console.error("Supabase Error:", error);
+            statusDiv.innerText = "❌ เกิดข้อผิดพลาด: " + error.message;
+            statusDiv.style.color = "red";
+            submitBtn.disabled = false;
+        } else {
+            statusDiv.innerText = "✅ ส่งคำสั่งพิมพ์เรียบร้อยแล้ว!";
+            statusDiv.style.color = "green";
+            alert(`ส่งคำสั่งพิมพ์สำเร็จ!\nไฟล์: ${fileName}`);
+            document.getElementById("printForm").reset();
+            submitBtn.disabled = false;
+        }
     });
 </script>
 
